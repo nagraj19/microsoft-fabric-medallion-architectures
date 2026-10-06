@@ -5,6 +5,8 @@ The Bronze Layer Pipeline is responsible for ingesting source data into the Bron
 
 The pipeline uses a metadata-driven approach, where a Lookup activity retrieves the required datasets/tables from the configuration. A ForEach activity then iterates through each item and executes the required data-loading process.
 
+![Bronze Layer Pipeline](./bronze-pipeline.png)
+
 Pipeline Flow
 Lookup → ForEach → Delete Data → Copy Data
 Activities

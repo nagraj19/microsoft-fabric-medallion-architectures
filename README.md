@@ -14,7 +14,7 @@ The objective is to ingest raw data, clean and transform it using PySpark, gener
 
 The following diagram illustrates the overall architecture implemented in this project.
 
-![Microsoft Fabric Medallion Architecture](images/Medalion%20architure%20layout.png)
+![Microsoft Fabric Medallion Architecture](Medalion%20architure%20layout.png)
 
 ### Architecture Flow
 
@@ -65,7 +65,7 @@ A metadata-driven pipeline was created to process multiple datasets dynamically 
 
 ## Bronze Pipeline Architecture
 
-![Bronze Layer Pipeline](images/Bronze%20layer%20pipeline.png)
+![Bronze Layer Pipeline](Bronze%20layer%20pipeline.png)
 
 ### Pipeline Flow
 
@@ -366,14 +366,13 @@ microsoft-fabric-medallion-architectures/
 |
 |-- README.md
 |
-|-- images/
-|   |-- Medalion architure layout.png
-|   |-- Bronze layer pipeline.png
+|-- Medalion architure layout.png
+|
+|-- Bronze layer pipeline.png
 |
 |-- Gold_layer_Notebook/
 |
 |-- Silver_layer_Notebook/
-|
 ```
 
 ---

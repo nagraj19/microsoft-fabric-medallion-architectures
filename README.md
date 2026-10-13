@@ -8,47 +8,44 @@ The project processes ShoppingMart data through three layers:
 
 **Bronze → Silver → Gold → Power BI**
 
-The objective is to ingest raw data, clean and transform it, create business-level KPIs, and prepare the data for analytics and reporting.
+The objective is to ingest raw data, clean and transform it using PySpark, generate business-level KPIs, and prepare the data for reporting and analytics.
 
----
+## Architecture
 
-# Architecture
+The following diagram illustrates the overall architecture implemented in this project.
+
+![Microsoft Fabric Medallion Architecture](images/Medalion%20architure%20layout.png)
+
+### Architecture Flow
 
 ```text
 Source Data
-    │
-    ▼
-┌──────────────────────┐
-│   Bronze Layer       │
-│   Raw Data           │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│   Silver Layer       │
-│ Cleaning &           │
-│ Transformation       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│   Gold Layer         │
-│ KPIs & Aggregations  │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│      Power BI        │
-│ Reporting & Analytics│
-└──────────────────────┘
+    |
+    v
+Fabric Data Factory / Pipeline
+    |
+    v
+Bronze Lakehouse
+(Raw Data)
+    |
+    v
+Silver Lakehouse
+(Cleaned and Transformed Data)
+    |
+    v
+Gold Lakehouse
+(Business-Ready Data and KPIs)
+    |
+    v
+Power BI
+(Reporting and Analytics)
 ```
 
----
-
-# Technologies Used
+## Technologies Used
 
 * Microsoft Fabric
-* Fabric Data Factory / Pipelines
+* Fabric Data Factory
+* Fabric Pipelines
 * Fabric Lakehouse
 * PySpark
 * Python
@@ -60,69 +57,75 @@ Source Data
 
 ---
 
-# Bronze Layer
+# 1. Bronze Layer – Raw Data Ingestion
 
 The Bronze layer is responsible for ingesting source data into the Fabric Lakehouse with minimal transformation.
 
-A metadata-driven pipeline was created to dynamically process multiple datasets.
+A metadata-driven pipeline was created to process multiple datasets dynamically using a reusable workflow.
 
-## Bronze Pipeline Flow
+## Bronze Pipeline Architecture
+
+![Bronze Layer Pipeline](images/Bronze%20layer%20pipeline.png)
+
+### Pipeline Flow
 
 ```text
 Lookup
-   ↓
+   |
+   v
 ForEach
-   ↓
+   |
+   v
 Delete Data
-   ↓
+   |
+   v
 Copy Data
-   ↓
+   |
+   v
 Bronze Lakehouse
 ```
 
-### 1. Lookup – Datamart_Bronzelayer Lookup
+### 1.1 Lookup – Datamart_Bronzelayer Lookup
 
 The Lookup activity retrieves metadata and configuration required for the Bronze data load.
 
-The metadata is passed to the ForEach activity for processing.
+The returned metadata is passed to the ForEach activity to process multiple datasets.
 
-### 2. ForEach – ForEach1
+### 1.2 ForEach – ForEach1
 
-The ForEach activity iterates through each dataset returned by the Lookup activity.
+The ForEach activity iterates through the datasets returned by the Lookup activity.
 
-This allows multiple datasets to be processed using a single reusable pipeline.
+This approach allows multiple files or datasets to be processed using a single reusable pipeline rather than creating a separate pipeline for each dataset.
 
-### 3. Delete Data
+### 1.3 Delete Data
 
-The Delete Data activity removes existing data from the target location before the new data is loaded.
+The Delete Data activity removes existing data from the configured target location before a new load.
 
-### 4. Copy Data
+This step supports a reload pattern. It should be configured carefully to avoid deleting data that must be retained.
 
-The Copy Data activity copies the source data into the Bronze Lakehouse.
+### 1.4 Copy Data
 
-The Bronze layer preserves the source data with minimal transformation.
+The Copy Data activity copies source data into the Bronze Lakehouse.
 
-## Bronze Layer Purpose
+The Bronze layer preserves the ingested data with minimal transformation, making it available for downstream processing.
 
-The Bronze layer:
+### Bronze Layer Objectives
 
-* Stores raw ingested data
-* Preserves source data
-* Provides a reliable source for downstream processing
-* Supports repeatable data ingestion
-* Enables scalable processing of multiple datasets
+* Store raw ingested data.
+* Preserve source data for downstream processing.
+* Support repeatable data ingestion.
+* Reduce duplicated pipeline development through metadata-driven processing.
+* Provide a foundation for Silver and Gold transformations.
 
 ---
 
-# Silver Layer
+# 2. Silver Layer – Data Cleaning and Transformation
 
-The Silver layer is responsible for cleaning and transforming the raw Bronze data into structured and usable datasets.
+The Silver layer transforms raw Bronze data into clean, structured, and reliable datasets.
 
-The Silver notebook reads the Bronze data using PySpark and performs data-quality and transformation operations before writing the results to the Silver Lakehouse.
+A Fabric notebook uses PySpark to perform data cleaning, standardization, and data-quality operations before writing the results to the Silver Lakehouse.
 
-## Silver Layer Processing
-
-The following datasets are processed:
+## Datasets Processed
 
 * Orders
 * Reviews
@@ -131,58 +134,59 @@ The following datasets are processed:
 
 ## Orders Transformation
 
-The Orders dataset is cleaned using PySpark.
+The Orders dataset is processed using PySpark.
 
-The processing includes:
+The transformations include:
 
-* Removing records with missing required values
-* Handling the `OrderDate` column
-* Converting `OrderDate` into a date data type
-* Preparing the dataset for downstream analytics
+* Removing records with missing required values.
+* Handling the `OrderDate` column.
+* Converting `OrderDate` into a date data type.
+* Preparing the cleaned dataset for downstream analytics.
 
-The cleaned Orders data is stored in the Silver Lakehouse.
+The transformed Orders data is then stored in the Silver Lakehouse.
 
 ## Silver Layer Output
 
 ```text
 Silver Lakehouse
-│
-├── customers.ordersdata
-│
-├── ShoppingMart_Silver_Reviews
-│   └── ShoppingMart_review
-│
-├── ShoppingMart_Silver_Social_Media
-│   └── ShoppingMart_social_media
-│
-└── ShoppingMart_Silver_Web_Logs
-    └── ShoppingMart_web_logs
+|
+|-- Orders
+|
+|-- Reviews
+|
+|-- Social Media
+|
+|-- Web Logs
 ```
 
 The Silver layer provides clean and structured data for the Gold transformation layer.
 
+### Silver Layer Objectives
+
+* Improve data quality.
+* Standardize data types and formats.
+* Handle missing or invalid values.
+* Prepare datasets for business-level calculations.
+* Create reliable inputs for downstream analytics.
+
 ---
 
-# Gold Layer
+# 3. Gold Layer – Business Transformations and KPIs
 
-The Gold layer contains business-ready data created from the Silver datasets.
+The Gold layer contains business-ready datasets generated from the cleaned Silver data.
 
-The Gold notebook reads the cleaned Silver data and performs aggregations to create useful business KPIs.
+A Fabric notebook reads the Silver datasets and performs aggregations to create useful business KPIs.
 
-## Gold Layer Processing
-
-The following datasets are read from the Silver Lakehouse:
+## Datasets Processed
 
 * Orders
 * Reviews
 * Social Media
 * Web Logs
 
----
-
 ## KPI 1 – Web Log Engagement
 
-Web log data is aggregated by:
+Web log data is grouped by:
 
 * `user_id`
 * `page`
@@ -190,21 +194,17 @@ Web log data is aggregated by:
 
 The number of occurrences is calculated using `count()`.
 
-This provides an indication of user engagement across different pages and actions.
+This provides insight into user engagement across different pages and actions.
 
 ### Example Output
 
-```text
-user_id | page       | action | count
---------------------------------------
-101     | Home       | Click  | 15
-101     | Products   | View   | 24
-102     | Checkout   | Click  | 8
-```
+| user_id | page     | action | count |
+| ------: | -------- | ------ | ----: |
+|     101 | Home     | Click  |    15 |
+|     101 | Products | View   |    24 |
+|     102 | Checkout | Click  |     8 |
 
 The aggregated results are stored in the Gold Web Logs dataset.
-
----
 
 ## KPI 2 – Social Media Sentiment
 
@@ -215,72 +215,62 @@ Social media data is grouped by:
 
 The number of records for each combination is calculated.
 
-This helps identify sentiment trends across different social media platforms.
+This helps identify sentiment trends across social media platforms.
 
 ### Example Output
 
-```text
-platform | sentiment | count
-----------------------------
-Instagram| Positive   | 120
-Instagram| Negative   | 35
-Facebook | Positive   | 95
-Twitter  | Neutral    | 52
-```
+| platform  | sentiment | count |
+| --------- | --------- | ----: |
+| Instagram | Positive  |   120 |
+| Instagram | Negative  |    35 |
+| Facebook  | Positive  |    95 |
+| Twitter   | Neutral   |    52 |
 
 The results are stored in the Gold Social Media dataset.
 
----
-
 ## KPI 3 – Average Product Rating
 
-The Reviews dataset is grouped by:
+The Reviews dataset is grouped by `product_id`.
 
-* `product_id`
+The average product rating is calculated for each product.
 
-The average rating is calculated for each product.
+### Example Output
 
-```text
-product_id | AvgRating
-----------------------
-101        | 4.5
-102        | 3.8
-103        | 4.2
-```
+| product_id | AvgRating |
+| ---------: | --------: |
+|        101 |       4.5 |
+|        102 |       3.8 |
+|        103 |       4.2 |
 
 The results are stored in the Gold Reviews dataset.
 
----
+*Note: The tables above illustrate the expected output format. Replace the example values with actual results from your notebook when available.*
 
-# Gold Layer Output
+## Gold Layer Output
 
 ```text
 Gold Lakehouse
-│
-├── ShoppingMart_Gold_Orders
-│   └── ShoppingMart_customers_orderdata
-│
-├── ShoppingMart_Gold_Reviews
-│   └── ShoppingMart_review
-│
-├── ShoppingMart_Gold_Social_Media
-│   └── ShoppingMart_social_media
-│
-└── ShoppingMart_Gold_Web_Logs
-    └── ShoppingMart_web_logs
+|
+|-- Gold Orders
+|
+|-- Gold Reviews
+|
+|-- Gold Social Media
+|
+|-- Gold Web Logs
 ```
 
 The Gold layer provides business-ready datasets for reporting and analytics.
 
 ---
 
-# Power BI
+# 4. Power BI – Reporting and Analytics
 
 The Gold layer is designed to provide the final analytical datasets required for reporting.
 
-The Gold data can be exposed through the Fabric Lakehouse and SQL Analytics Endpoint and then consumed by Power BI.
+Gold data can be consumed by Power BI through supported Fabric connectivity options, such as the Lakehouse SQL analytics endpoint where appropriate.
 
-The reporting layer can be used to create dashboards for:
+Potential dashboard areas include:
 
 * Order analysis
 * Product ratings
@@ -288,70 +278,75 @@ The reporting layer can be used to create dashboards for:
 * User engagement
 * Customer and product insights
 
+**Status:** Power BI reporting is in progress.
+
 ---
 
-# End-to-End Data Flow
+# 5. End-to-End Data Flow
 
-The complete project follows this flow:
+The complete project follows this workflow:
 
 ```text
-                 SOURCE DATA
-                     │
-                     ▼
-          ┌─────────────────────┐
-          │   BRONZE PIPELINE   │
-          │                     │
-          │ Lookup              │
-          │    ↓                │
-          │ ForEach             │
-          │    ↓                │
-          │ Delete Data         │
-          │    ↓                │
-          │ Copy Data           │
-          └──────────┬──────────┘
-                     │
-                     ▼
+                  SOURCE DATA
+                      |
+                      v
+           FABRIC DATA FACTORY
+                  PIPELINE
+                      |
+                      v
+              LOOKUP ACTIVITY
+                      |
+                      v
+              FOREACH ACTIVITY
+                      |
+                      v
+               DELETE / COPY
+                      |
+                      v
               BRONZE LAKEHOUSE
-                     │
-                     ▼
-             SILVER NOTEBOOK
-                     │
-          Cleaning & Transformation
-                     │
-                     ▼
+                      |
+                      v
+               SILVER NOTEBOOK
+                      |
+                      v
+           CLEANING AND TRANSFORMATION
+                      |
+                      v
               SILVER LAKEHOUSE
-                     │
-                     ▼
-              GOLD NOTEBOOK
-                     │
-            KPI Aggregations
-                     │
-                     ▼
+                      |
+                      v
+                GOLD NOTEBOOK
+                      |
+                      v
+               KPI AGGREGATIONS
+                      |
+                      v
                GOLD LAKEHOUSE
-                     │
-                     ▼
-                  POWER BI
+                      |
+                      v
+                   POWER BI
 ```
 
 ---
 
-# Project Objectives
+# 6. Project Objectives
 
 The main objectives of this project are:
 
-1. Build a metadata-driven ingestion pipeline.
+1. Build a metadata-driven data ingestion pipeline.
 2. Implement the Bronze layer for raw data ingestion.
 3. Implement the Silver layer for data cleaning and transformation.
 4. Implement the Gold layer for business-level aggregations.
-5. Create analytical KPIs from customer and product data.
-6. Prepare Gold data for Power BI reporting.
-7. Demonstrate an end-to-end Microsoft Fabric data engineering workflow.
+5. Generate analytical KPIs from ShoppingMart datasets.
+6. Prepare Gold datasets for Power BI reporting.
+7. Understand how Fabric Pipelines, Lakehouse, and PySpark work together.
+8. Demonstrate an end-to-end Microsoft Fabric data engineering workflow.
 
 ---
 
-# Project Status
+# 7. Project Status
 
-| Layer                  | Status      |
+| Component              | Status      |
 | ---------------------- | ----------- |
 | Bronze Pipeline        | Completed   |
 | Bronze Lakehouse       | Completed   |
@@ -364,30 +359,40 @@ The main objectives of this project are:
 
 ---
 
-# Repository Structure
+# 8. Repository Structure
 
 ```text
 microsoft-fabric-medallion-architectures/
-│
-├── README.md
-│
-├── Gold_layer_Notebook/
-│
-├── Silver_layer_Notebook/
-│
-├── Screenshot 2026-10-06 172656.png
-│
-└── Bronze Pipeline Documentation
+|
+|-- README.md
+|
+|-- images/
+|   |-- Medalion architure layout.png
+|   |-- Bronze layer pipeline.png
+|
+|-- Gold_layer_Notebook/
+|
+|-- Silver_layer_Notebook/
+|
 ```
 
 ---
 
-# Key Learning
+# 9. Key Learnings
 
-This project demonstrates how Microsoft Fabric can be used to build a complete modern data platform using the Medallion Architecture.
+Through this project, I explored how Microsoft Fabric can support an end-to-end data engineering workflow using the Medallion Architecture.
 
-The project separates:
+Key concepts include:
 
-**Raw Data → Clean Data → Business Data → Reporting**
+* Building reusable, metadata-driven Fabric Pipelines.
+* Ingesting source data into a Bronze Lakehouse.
+* Cleaning and transforming data using PySpark.
+* Creating Silver and Gold data layers.
+* Generating business KPIs through aggregations.
+* Preparing structured datasets for Power BI reporting.
 
-This separation makes the data pipeline easier to maintain, troubleshoot, scale, and consume for analytics.
+The project follows the principle:
+
+**Raw Data → Clean Data → Business-Ready Data → Reporting**
+
+This layered approach helps separate ingestion, data quality, and business transformations, making data solutions easier to maintain, troubleshoot, and extend.
